@@ -1,0 +1,2 @@
+#!/bin/sh
+../../cvtools/cpp-example-calibration -w=7 -h=7 -o=newcam.yml -op -oe -V $1
