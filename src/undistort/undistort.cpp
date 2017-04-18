@@ -3,12 +3,9 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/utility.hpp>
-#include <opencv2/videoio.hpp>
 
-#include <cctype>
 #include <stdio.h>
-#include <string.h>
-#include <time.h>
+#include <string>
 
 #include "../UtilityLib/common.hpp"
 
@@ -31,10 +28,6 @@ int main( int argc, char** argv )
     string outputFilename;
     string camFilename;
     string inputFilename;
-    
-    int frameNumber;
-
-    VideoCapture capture;
 
     // Command line argument parsing
     cv::CommandLineParser parser(argc, argv,
