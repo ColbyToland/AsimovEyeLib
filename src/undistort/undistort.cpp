@@ -10,7 +10,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "CamIntrinsicReader.hpp"
+#include "../UtilityLib/common.hpp"
 
 using namespace cv;
 using namespace std;
@@ -52,7 +52,7 @@ int main( int argc, char** argv )
     
     outputFilename = parser.get<string>("o");
     camFilename = parser.get<string>("@instrinsics");
-    inputFilename = parser.get<int>("@image");
+    inputFilename = parser.get<string>("@image");
     if (!parser.check())
     {
         help();
@@ -64,7 +64,8 @@ int main( int argc, char** argv )
     Mat image;
     if( !inputFilename.empty() )
     {
-        if ( !imread(inputFilename, image) )
+        image = imread(inputFilename);
+        if ( image.empty() )
         {
             fprintf(stderr, "Cannot open image\n");
             return -1;
@@ -77,10 +78,17 @@ int main( int argc, char** argv )
     }
     
     // Read intrinsic parameters
-    
+    Mat cam_mat;
+    Mat dist_coeff;
+    if ( !parseCamFile(camFilename, cam_mat, dist_coeff) )
+    {
+        fprintf(stderr, "Bad camera intrinsic file\n");
+        return -1;
+    }
 
     // Undistort image
     Mat undist;
+    undistort(image, undist, cam_mat, dist_coeff, cam_mat);
     
     // Save undistorted image
     imwrite(outputFilename, undist);
