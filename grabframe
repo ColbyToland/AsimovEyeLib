@@ -1,0 +1,3 @@
+#!/bin/sh
+./framegrabber -o=Data/goprovid/frames/$1.jpg -u=Data/goprocalib/mp4camera.yml Data/goprovid/$1.MP4 100
+

@@ -3,26 +3,23 @@
 #include <iostream>
 #include <string>
 
-using namespace std;
-using namespace cv;
-
-bool parseCamFile(string filename, Mat& intrinsics, Mat& dist_coef)
+bool parseCamFile(const std::string filename, cv::Mat& intrinsics, cv::Mat& dist_coef)
 {
-    FileStorage camFile;
-    camFile.open(filename, FileStorage::READ);
+    cv::FileStorage camFile;
+    camFile.open(filename, cv::FileStorage::READ);
     if ( !camFile.isOpened() )
     {
-        cerr << "Cannot open " << filename << endl;
+        std::cerr << "Cannot open " << filename << std::endl;
         return false;
     }
     
-    Mat temp;
+    cv::Mat temp;
     
     // Read camera matrix
     camFile["camera_matrix"] >> temp;
     if ( temp.empty() )
     {
-        cerr << "Failed to read camera_matrix in " << filename << endl;
+        std::cerr << "Failed to read camera_matrix in " << filename << std::endl;
         return false;
     }
     temp.copyTo(intrinsics);
@@ -31,7 +28,7 @@ bool parseCamFile(string filename, Mat& intrinsics, Mat& dist_coef)
     camFile["distortion_coefficients"] >> temp;
     if ( temp.empty() )
     {
-        cerr << "Failed to read distortion_coefficients in " << filename << endl;
+        std::cerr << "Failed to read distortion_coefficients in " << filename << std::endl;
         return false;
     }
     temp.copyTo(dist_coef);
@@ -39,3 +36,53 @@ bool parseCamFile(string filename, Mat& intrinsics, Mat& dist_coef)
     return true;    
 }
 
+
+
+bool parseImageList(const std::string& filename, 
+                    std::vector<cv::Mat>& img_list, 
+                    cv::Mat intrinsics = cv::Mat(), 
+                    cv::Mat distortionCoeff = cv::Mat() )
+{
+    img_list.resize(0);
+    
+    cv::FileStorage fs(filename, cv::FileStorage::READ);
+    if( !fs.isOpened() )
+    {
+        std::cerr << "Failed to open image list: " << filename << std::endl;
+        return false;
+    }
+    
+    cv::FileNode n = fs.getFirstTopLevelNode();
+    if( n.type() != cv::FileNode::SEQ )
+    {
+        std::cerr << "Image list file " << filename << " did not contain an image list" << std::endl;
+        return false;
+    }
+    
+    cv::FileNodeIterator it = n.begin(), it_end = n.end();
+    for( ; it != it_end; ++it )
+    {
+        cv::Mat img = cv::imread((std::string)*it);
+        if ( img.empty() )
+            std::cerr << "Image file not found: " << (std::string)*it << std::endl;
+        else
+        {
+            if (intrinsics.empty()) 
+                img_list.push_back(img);
+            else
+            {
+                cv::Mat undist;
+                cv::undistort(img, undist, intrinsics, distortionCoeff, intrinsics);
+                img_list.push_back(undist);
+            }
+        }
+    }
+            
+    if (img_list.size() == 0)
+    {
+        std::cerr << "No images found" << std::endl;
+        return false;
+    }
+            
+    return true;
+}
