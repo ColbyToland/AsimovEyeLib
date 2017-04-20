@@ -3,11 +3,14 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/utility.hpp>
-#include "opencv2/features2d/features2d.hpp"
-#include "opencv2/calib3d/calib3d.hpp"
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/highgui.hpp>
 
+#include <cmath>
 #include <map>
 #include <stdio.h>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -20,6 +23,7 @@ static void help()
 {
     printf( "This is a camera calibration sample.\n"
         "Usage: register\n"
+        "     [--all]                  # save intermediary transforms\n"
         "     [-o=<out_params>]        # the output filename for the grabbed frame\n"
         "     [-c=<cam_intrinsics>]    # yml containing camera intrinsics parameters\n"
         "     [image_list]             # input image list\n"
@@ -39,7 +43,7 @@ int main( int argc, char** argv )
     cv::CommandLineParser parser(argc, argv,
         "{help h usage ?|               | print this message        }"
         "{all           |               |                           }"
-        "{o             | undistort.jpg | output image name         }"
+        "{o             | positions.yml | output file name          }"
         "{c             |               | camera intrinsics yml     }"
         "{@image_list   |               | image list                }"
         );
@@ -75,22 +79,53 @@ int main( int argc, char** argv )
     
     // Open images from image list
     vector<Mat> images;
-    if ( !parseImageList(inputFilename, images, cam_mat, dist_coeff) )
+    vector<string> image_names;
+    if ( !parseImageList(inputFilename, images, image_names, cam_mat, dist_coeff) )
     {
         fprintf(stderr, "Bad image list file\n");
         return -1;
     }
+    int imageCount = images.size();
 
     // Find features in each image
-    vector<vector<KeyPoint> > keypoints(images.size());
-    vector<Mat> descriptors(images.size());
+    vector<vector<KeyPoint> > keypoints(imageCount);
+    vector<Mat> descriptors(imageCount);
     Ptr<ORB> detector = ORB::create();
-    for (int ind = 0; ind < images.size(); ++ind)
+    for (int ind = 0; ind < imageCount; ++ind)
         detector->detectAndCompute( images[ind], noArray(), keypoints[ind], descriptors[ind] );
+        
+    // Prep image of image nodes and transform connections
+    const double PI = 3.14159;
+    Mat graphImg(500, 500, CV_8UC3, Scalar(255,255,255));
+    Point center(250,250);
+    double radius = 200;
+    double dTheta = 2*PI / (double)imageCount;
+    vector<Point> nodes(imageCount);
+    //circle(graphImg, center, radius, Scalar(0,0,0), 3);
+    
+    for (int imgInd = 0; imgInd < imageCount; ++imgInd)
+    {
+        double theta = imgInd*dTheta;
+        double x = center.x + radius*cos(theta);
+        double y = center.y + radius*sin(theta);
+        nodes[imgInd] = Point(x,y);
+        
+        putText(graphImg, 
+                image_names[imgInd], 
+                (nodes[imgInd]-center)*1.2+center, 
+                FONT_HERSHEY_SIMPLEX, 
+                1, 
+                Scalar(255,0,0) );
+    }
+                
+    int total_connections = imageCount*(imageCount - 1);
+    int failed_connections = total_connections;
     
     // Find corresponding features and pairwise [R|t]
-    Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");;
+    Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
     map<pair<int,int>, pair<Mat,Mat> > positionMats;
+    map<pair<int,int>, pair<int,int> > matScore;
+    FileStorage fs(outputFilename, FileStorage::WRITE);
     for (int topInd = 0; topInd < images.size() - 1; ++topInd)
     {
         for (int innerInd = 0; innerInd < images.size(); ++innerInd)
@@ -105,7 +140,8 @@ int main( int argc, char** argv )
             //  closer than the next best match
             vector<Point2f> pts1;
             vector<Point2f> pts2;
-            for(unsigned i = 0; i < matches.size(); i++)
+            int correspondence = matches.size();
+            for(unsigned i = 0; i < correspondence; i++)
             {
                 if(matches[i][0].distance < 0.8 * matches[i][1].distance)
                 {
@@ -113,22 +149,42 @@ int main( int argc, char** argv )
                     pts2.push_back(keypoints[innerInd][matches[i][0].trainIdx].pt);
                 }
             }
+            correspondence = pts1.size();
+            
+            line(graphImg, nodes[topInd], nodes[innerInd], Scalar(0,0,255));
+            
+            // Too little correspondence check
+            if (correspondence < 20) continue;
     
             // Calculate [R|t] transform between pair of images
             Mat E = findEssentialMat(pts1, pts2, cam_mat);
             Mat R, T;
             int inliers = recoverPose(E, pts1, pts2, cam_mat, R, T);
+            
+            // Too few inliers check
+            if (inliers*2 < correspondence) continue;
+            
+            --failed_connections;
+            
+            // Store result
             pair<int,int> mapKey(topInd,innerInd);
             positionMats[mapKey] = pair<Mat,Mat>(R,T);  
+            matScore[mapKey] = pair<int,int>(correspondence,inliers);
             
-            cout << "[" << topInd << "," << innerInd << "]:" << endl;
-            cout << R << endl;
-            cout << T << endl;
-            cout << endl;          
+            line(graphImg, nodes[topInd], nodes[innerInd], Scalar(0,255,0));
     
             if ( save_all )
             {
-                // Write pairwise transform
+                // Write pairwise transform        
+                fs << "Transform";
+                fs << "{";
+                fs << "One" << topInd;
+                fs << "Two" << innerInd;
+                fs << "Correspondence" << correspondence;
+                fs << "Inliers" << inliers;
+                fs << "R" << R;
+                fs << "T" << T;
+                fs << "}";
             }
             
         }
@@ -138,7 +194,21 @@ int main( int argc, char** argv )
     
     // Write the consensus result
     
+    fs.release();
+    
     printf("Success.\n");
+    
+    stringstream ss;
+    ss << failed_connections << " of " << total_connections;
+    putText(graphImg, 
+            ss.str(), 
+            center, 
+            FONT_HERSHEY_SIMPLEX, 
+            1, 
+            Scalar(0,0,0) );
+    
+    imshow("Camera Transform Graph", graphImg);
+    waitKey();
 
     return 0;
 }

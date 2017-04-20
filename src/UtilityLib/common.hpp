@@ -40,6 +40,7 @@ bool parseCamFile(const std::string filename, cv::Mat& intrinsics, cv::Mat& dist
 
 bool parseImageList(const std::string& filename, 
                     std::vector<cv::Mat>& img_list, 
+                    std::vector<std::string>& img_names,
                     cv::Mat intrinsics = cv::Mat(), 
                     cv::Mat distortionCoeff = cv::Mat() )
 {
@@ -62,11 +63,13 @@ bool parseImageList(const std::string& filename,
     cv::FileNodeIterator it = n.begin(), it_end = n.end();
     for( ; it != it_end; ++it )
     {
-        cv::Mat img = cv::imread((std::string)*it);
+        std::string fname = (std::string)*it;
+        cv::Mat img = cv::imread(fname);
         if ( img.empty() )
-            std::cerr << "Image file not found: " << (std::string)*it << std::endl;
+            std::cerr << "Image file not found: " << fname << std::endl;
         else
         {
+            img_names.push_back(fname);
             if (intrinsics.empty()) 
                 img_list.push_back(img);
             else
