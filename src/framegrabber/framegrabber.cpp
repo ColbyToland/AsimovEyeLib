@@ -68,6 +68,7 @@ int main( int argc, char** argv )
     Mat frame;
     capture.set(CV_CAP_PROP_POS_FRAMES, frameNumber);
     capture >> frame;
+    capture.release();
     
     // Save frame
     imwrite(outputFilename, frame);
