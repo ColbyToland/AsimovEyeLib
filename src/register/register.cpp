@@ -96,7 +96,7 @@ int main( int argc, char** argv )
         
     // Prep image of image nodes and transform connections
     const double PI = 3.14159;
-    Mat graphImg(500, 500, CV_8UC3, Scalar(255,255,255));
+    Mat graphImg = Mat::zeros(500,700,CV_8UC3);//(500, 700, CV_8UC3, Scalar(255,255,255));
     Point center(250,250);
     double radius = 200;
     double dTheta = 2*PI / (double)imageCount;
@@ -112,10 +112,14 @@ int main( int argc, char** argv )
         
         putText(graphImg, 
                 image_names[imgInd], 
-                (nodes[imgInd]-center)*1.2+center, 
+                nodes[imgInd], 
                 FONT_HERSHEY_SIMPLEX, 
                 1, 
                 Scalar(255,0,0) );
+                
+        Mat tempImg;
+        drawKeypoints(images[imgInd], keypoints[imgInd], tempImg);
+        imwrite("kp_" + image_names[imgInd], tempImg);
     }
                 
     int total_connections = imageCount*(imageCount - 1);
@@ -140,18 +144,30 @@ int main( int argc, char** argv )
             //  closer than the next best match
             vector<Point2f> pts1;
             vector<Point2f> pts2;
+            vector<DMatch> good_matches;
             int correspondence = matches.size();
             for(unsigned i = 0; i < correspondence; i++)
             {
                 if(matches[i][0].distance < 0.8 * matches[i][1].distance)
                 {
+                    good_matches.push_back(matches[i][0]);
                     pts1.push_back(keypoints[topInd][matches[i][0].queryIdx].pt);
                     pts2.push_back(keypoints[innerInd][matches[i][0].trainIdx].pt);
                 }
             }
             correspondence = pts1.size();
+                
+            Mat mergeImg;
+            size_t lastdot = image_names[topInd].find_last_of(".");
+            string topName = image_names[topInd].substr(0,lastdot);
+            string newfname = "matches_" + topName + "_" + image_names[innerInd];
+            drawMatches(images[topInd], keypoints[topInd], 
+                        images[innerInd], keypoints[innerInd], 
+                        good_matches, 
+                        mergeImg);            
+            imwrite(newfname, mergeImg);
             
-            line(graphImg, nodes[topInd], nodes[innerInd], Scalar(0,0,255));
+            //line(graphImg, nodes[topInd], nodes[innerInd], Scalar(0,0,255));
             
             // Too little correspondence check
             if (correspondence < 20) continue;
