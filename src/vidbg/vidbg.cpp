@@ -78,12 +78,15 @@ int main( int argc, char** argv )
     const int colors = 3;
     int bins = 32;
     Mat newHist(colors, bins, CV_32SC1);
-    while (true)
+    //while (true)
+    for (int frameNo = 0; frameNo < 10; ++frameNo)
     {
         Mat frame;
         capture >> frame;
         if ( frame.empty() ) 
             break;
+            
+        cout << "\tFrame: " << frameNo << endl;
             
         // Iterate over each pixel and update the appropriate histogram
         MatIterator_<Vec3b> it, end;
@@ -92,7 +95,13 @@ int main( int argc, char** argv )
         for ( ; it != end; ++it )
         {
             Point rcpos = it.pos();
-            Mat& curHist = histograms[pair<int,int>(rcpos.x,rcpos.y)];
+            pair<int,int> key(rcpos.y,rcpos.x);
+            if ( histograms.count(key) == 0 )
+            {
+                histograms[key] = Mat();
+                newHist.copyTo(histograms[key]);
+            }
+            Mat& curHist = histograms[key];
             for (int colorInd = 0; colorInd < colors; ++colorInd)
             {
                 int bin = (*it)[colorInd] >> 8;
@@ -103,7 +112,7 @@ int main( int argc, char** argv )
     }
     
     // Find the most common value for each pixel
-    Mat bgImg(width, height, CV_8UC3);
+    Mat bgImg(height, width, CV_8UC3);
     for ( size_t row = 0; row < height; ++row )
     {
         for ( size_t col = 0; col < width; ++col )
@@ -111,10 +120,22 @@ int main( int argc, char** argv )
             // Find the most frequently occuring color
             Vec3b frequentColor(0,0,0);
             int maxBin;
+            Mat& curHist = histograms[pair<int,int>(row,col)];
             for (int colorInd = 0; colorInd < colors; ++colorInd)
             {
-                minMaxIdx(histograms[pair<int,int>(row,col)].row(colorInd), NULL, NULL, NULL, &maxBin);
-                frequentColor[colorInd] = maxBin << 8;
+                int maxCount = 0;
+                unsigned short maxBin;
+                for ( int binInd = 0; binInd < bins; ++binInd)
+                {
+                    int binVal = curHist.at<int>(colorInd,binInd);
+                    if (binVal > maxCount)
+                    {
+                        maxCount = binVal;
+                        maxBin = binInd*8;
+                    }
+                }
+                
+                frequentColor[colorInd] = maxBin;
             }
             
             // Store most frequently occuring color to the background
@@ -124,6 +145,8 @@ int main( int argc, char** argv )
     
     // Output best estimated background image
     imwrite(outputFilename, bgImg);
+    
+    cout << "success." << endl;
     
     capture.release();
 
