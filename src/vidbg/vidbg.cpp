@@ -74,7 +74,10 @@ int main( int argc, char** argv )
     height = (size_t)capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
     // Read in video
-    vector<Mat> vid;
+    map<pair<int,int>, Mat> histograms;
+    const int colors = 3;
+    int bins = 32;
+    Mat newHist(colors, bins, CV_32SC1);
     while (true)
     {
         Mat frame;
@@ -82,48 +85,36 @@ int main( int argc, char** argv )
         if ( frame.empty() ) 
             break;
             
-        vid.push_back(frame);
+        // Iterate over each pixel and update the appropriate histogram
+        MatIterator_<Vec3b> it, end;
+        it = frame.begin<Vec3b>();
+        end = frame.end<Vec3b>();
+        for ( ; it != end; ++it )
+        {
+            Point rcpos = it.pos();
+            Mat& curHist = histograms[pair<int,int>(rcpos.x,rcpos.y)];
+            for (int colorInd = 0; colorInd < colors; ++colorInd)
+            {
+                int bin = (*it)[colorInd] >> 8;
+                int curVal = curHist.at<int>(bin);
+                curHist.at<int>(bin) = curVal + 1;
+            }
+        }
     }
-    size_t frameCount = vid.size();
     
     // Find the most common value for each pixel
-    Mat bgImg(width, height, CV_8UC3);         
-        // Histogram setup
-        int bins = 32;
-        int histSize[] = {bins, bins, bins};
-        float colorranges[] = { 0, 256 };
-        const float* ranges[] = { colorranges, colorranges, colorranges };
-        int channels[] = {0, 1, 2};
+    Mat bgImg(width, height, CV_8UC3);
     for ( size_t row = 0; row < height; ++row )
     {
         for ( size_t col = 0; col < width; ++col )
-        {
-            Mat colors(1, frameCount, CV_8UC3);
-            for ( size_t frameNo = 0; frameNo < frameCount; ++frameNo )
-                colors.at<Vec3b>(0,frameNo) = vid[frameNo].at<Vec3b>(row,col);
-            
-            Mat colorHist;
-            calcHist(&colors, 1, channels, Mat(), colorHist, 3, histSize, ranges);
-            
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            // !!! CURRENT DEV POSITION !!!
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            // !!! Figure out how to iterate over the histogram !!!
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            
+        {        
             // Find the most frequently occuring color
-            int maxCount = 0;
-            Scalar frequentColor = Scalar(0,0,0);
-            MatIterator_<Vec3b> it, end;
-            it = colorHist.begin<Vec3b>();
-            end = colorHist.end<Vec3b>();
-            for ( ; it != end; ++it )
+            Vec3b frequentColor(0,0,0);
+            int maxBin;
+            for (int colorInd = 0; colorInd < colors; ++colorInd)
             {
-                if ( (*it) > maxCount )
-                {
-                    maxCount = *it;
-                    frequentColor = it.pos()*8;
-                }
+                minMaxIdx(histograms[pair<int,int>(row,col)].row(colorInd), NULL, NULL, NULL, &maxBin);
+                frequentColor[colorInd] = maxBin << 8;
             }
             
             // Store most frequently occuring color to the background
