@@ -25,12 +25,16 @@ int main( int argc, char** argv )
     string outputFilename;
     string camFilename;
     string inputFilename;
+    
+    int startFrame, totalFrames;
 
     // Command line argument parsing
     cv::CommandLineParser parser(argc, argv,
         "{help h usage ?|               | print this message        }"
         "{o             | bgimg.jpg     | output file name          }"
         "{c             |               | camera intrinsics yml     }"
+        "{s             | 0             | start frame               }"
+        "{n             | 10            | number of frames          }"
         "{@vid_name     |               | video file name           }"
         );
         
@@ -43,6 +47,8 @@ int main( int argc, char** argv )
     outputFilename = parser.get<string>("o");
     camFilename = parser.get<string>("c");
     inputFilename = parser.get<string>("@vid_name");
+    startFrame = parser.get<int>("s");
+    totalFrames = parser.get<int>("n");
     if (!parser.check())
     {
         parser.printMessage();
@@ -77,16 +83,23 @@ int main( int argc, char** argv )
     map<pair<int,int>, Mat> histograms;
     const int colors = 3;
     int bins = 32;
-    Mat newHist(colors, bins, CV_32SC1);
-    //while (true)
-    for (int frameNo = 0; frameNo < 10; ++frameNo)
+    Mat newHist = Mat::zeros(colors, bins, CV_32SC1);
+    capture.set(CV_CAP_PROP_POS_FRAMES, startFrame);
+    for (int frameNo = 0; frameNo < totalFrames; ++frameNo)
     {
         Mat frame;
         capture >> frame;
         if ( frame.empty() ) 
             break;
             
-        cout << "\tFrame: " << frameNo << endl;
+        if (calibrated)
+        {
+            Mat temp;
+            frame.copyTo(temp);
+            undistort(temp, frame, cam_mat, dist_coeff, cam_mat);
+        }
+            
+        cout << "\tFrame: " << startFrame + frameNo << endl;
             
         // Iterate over each pixel and update the appropriate histogram
         MatIterator_<Vec3b> it, end;
@@ -104,9 +117,9 @@ int main( int argc, char** argv )
             Mat& curHist = histograms[key];
             for (int colorInd = 0; colorInd < colors; ++colorInd)
             {
-                int bin = (*it)[colorInd] >> 8;
-                int curVal = curHist.at<int>(bin);
-                curHist.at<int>(bin) = curVal + 1;
+                int bin = (*it)[colorInd] / 8;
+                int curVal = curHist.at<int>(colorInd,bin);
+                curHist.at<int>(colorInd,bin) = curVal + 1;
             }
         }
     }
