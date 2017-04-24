@@ -81,10 +81,10 @@ int main( int argc, char** argv )
 
     // Read in video
     map<pair<int,int>, Mat> histograms;
-    const int colors = 3;
     int bins = 32;
-    Mat newHist = Mat::zeros(colors, bins, CV_32SC1);
+    Mat newHist = Mat::zeros(1, bins, CV_32SC1);
     capture.set(CV_CAP_PROP_POS_FRAMES, startFrame);
+    Mat bgImg(height, width, CV_8UC3);
     for (int frameNo = 0; frameNo < totalFrames; ++frameNo)
     {
         Mat frame;
@@ -92,12 +92,15 @@ int main( int argc, char** argv )
         if ( frame.empty() ) 
             break;
             
+        // Preprocess image
+        Mat temp;
         if (calibrated)
         {
-            Mat temp;
             frame.copyTo(temp);
             undistort(temp, frame, cam_mat, dist_coeff, cam_mat);
         }
+        frame.copyTo(temp);
+        cvtColor(temp,frame,COLOR_BGR2HSV);
             
         cout << "\tFrame: " << startFrame + frameNo << endl;
             
@@ -115,18 +118,22 @@ int main( int argc, char** argv )
                 newHist.copyTo(histograms[key]);
             }
             Mat& curHist = histograms[key];
-            for (int colorInd = 0; colorInd < colors; ++colorInd)
-            {
-                int bin = (*it)[colorInd] / 8;
-                int curVal = curHist.at<int>(colorInd,bin);
-                curHist.at<int>(colorInd,bin) = curVal + 1;
-            }
+            
+            int bin = (*it)[0] / 8;
+            if ( (*it)[2] < 50 ) bin = 0;
+            int curVal = curHist.at<int>(0,bin);
+            curHist.at<int>(0,bin) = curVal + 1;
+            
+            // Fill the saturation and value with a running average
+            Vec3b curColor = bgImg.at<Vec3b>(rcpos);
+            curColor[1] = saturate_cast<uchar>((frameNo*curColor[1] + (*it)[1]) / (frameNo + 1));
+            curColor[2] = saturate_cast<uchar>((frameNo*curColor[2] + (*it)[2]) / (frameNo + 1));
+            bgImg.at<Vec3b>(rcpos) = curColor;
         }
     }
     
     // Find the most common value for each pixel
-    Mat bgImg(height, width, CV_8UC3);
-    Mat rngImg(height, width, CV_8UC3);
+    Mat rngImg = Mat::zeros(height, width, CV_8UC3);
     for ( size_t row = 0; row < height; ++row )
     {
         for ( size_t col = 0; col < width; ++col )
@@ -135,32 +142,32 @@ int main( int argc, char** argv )
             Vec3b frequentColor(0,0,0);
             Vec3b secondColor(0,0,0);
             Mat& curHist = histograms[pair<int,int>(row,col)];
-            for (int colorInd = 0; colorInd < colors; ++colorInd)
+            int maxCount = 0;
+            int maxBin[] = {-1, -1};
+            for ( int binInd = 0; binInd < bins; ++binInd)
             {
-                int maxCount = 0;
-                unsigned short maxBin[] = {0, 0};
-                for ( int binInd = 0; binInd < bins; ++binInd)
+                int binVal = curHist.at<int>(0,binInd);
+                if (binVal > maxCount)
                 {
-                    int binVal = curHist.at<int>(colorInd,binInd);
-                    if (binVal > maxCount)
-                    {
-                        maxCount = binVal;
-                        maxBin[1] = maxBin[0];
-                        maxBin[0] = binInd*8;
-                    }
+                    maxCount = binVal;
+                    maxBin[1] = maxBin[0];
+                    maxBin[0] = binInd*8;
                 }
-                
-                frequentColor[colorInd] = maxBin[0];
-                secondColor[colorInd] = maxBin[1];
             }
             
             // Store most frequently occuring color to the background
-            bgImg.at<Vec3b>(row,col) = frequentColor;
-            rngImg.at<Vec3b>(row,col) = secondColor;
+            bgImg.at<Vec3b>(row,col)[0] = saturate_cast<uchar>(maxBin[0]);
+            if ( maxBin[1] != -1 )
+            {
+                rngImg.at<Vec3b>(row,col) = bgImg.at<Vec3b>(row,col);
+                rngImg.at<Vec3b>(row,col)[0] = saturate_cast<uchar>(maxBin[1]);
+            }
         }
     }
     
     // Output best estimated background image
+    cvtColor(bgImg,bgImg,COLOR_HSV2BGR);
+    cvtColor(rngImg,rngImg,COLOR_HSV2BGR);
     imwrite(outputFilename, bgImg);
     imwrite("range_" + outputFilename, rngImg);
     
