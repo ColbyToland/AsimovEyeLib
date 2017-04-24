@@ -26,12 +26,17 @@ int main( int argc, char** argv )
     string camFilename;
     string inputFilename;
     string bgimgFilename;
+    
+    int startFrame, totalFrames;
+    bool allFrames = false;
 
     // Command line argument parsing
     cv::CommandLineParser parser(argc, argv,
         "{help h usage ?|               | print this message        }"
         "{o             | fground.avi   | output file name          }"
         "{c             |               | camera intrinsics yml     }"
+        "{s             | 0             | start frame number        }"
+        "{n             | 1000          | total frames to convert   }"        
         "{@vid_name     |               | video file name           }"
         "{@bgimg        |               | bg image file             }"
         );
@@ -44,6 +49,9 @@ int main( int argc, char** argv )
     
     outputFilename = parser.get<string>("o");
     camFilename = parser.get<string>("c");
+    startFrame = parser.get<int>("s");
+    totalFrames = parser.get<int>("n");
+    allFrames = !parser.has("n");
     inputFilename = parser.get<string>("@vid_name");
     bgimgFilename = parser.get<string>("@bgimg");
     if (!parser.check())
@@ -84,23 +92,32 @@ int main( int argc, char** argv )
         fprintf(stderr, "Video and bg image are different sizes\n");
         return -1;
     }
-
-    // Read in video
+    
+    // Open output video file
     VideoWriter writer;
     int codec = CV_FOURCC('M', 'J', 'P', 'G');
     double fps = 25.0;
     writer.open(outputFilename, codec, fps, bgimg.size(), true);
-    if (!writer.isOpened()) {
+    if ( !writer.isOpened() ) 
+    {
         fprintf(stderr, "Could not open the output video file for write\n");
         return -1;
     }
-    while(true)
+
+    // Process the video and store it
+    capture.set(CV_CAP_PROP_POS_FRAMES, startFrame);
+    for (int frameNo = 0; frameNo < totalFrames; ++frameNo)
     {
+        // Reset the iterating variable to convert this to a while(true) loop
+        if ( allFrames ) frameNo = 0;
+    
+        // Read and check
         Mat frame;
         capture >> frame;
         if ( frame.empty() ) 
             break;
             
+        // Undistort if necessary
         if (calibrated)
         {
             Mat temp;
@@ -108,9 +125,11 @@ int main( int argc, char** argv )
             undistort(temp, frame, cam_mat, dist_coeff, cam_mat);
         }
         
+        // Sadly basic bg subtraction
         Mat diffImg;
         subtract(frame,bgimg,diffImg);
         
+        // Store frame
         writer.write(diffImg);
     }
     

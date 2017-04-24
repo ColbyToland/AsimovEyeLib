@@ -46,9 +46,9 @@ int main( int argc, char** argv )
     
     outputFilename = parser.get<string>("o");
     camFilename = parser.get<string>("c");
-    inputFilename = parser.get<string>("@vid_name");
     startFrame = parser.get<int>("s");
     totalFrames = parser.get<int>("n");
+    inputFilename = parser.get<string>("@vid_name");
     if (!parser.check())
     {
         parser.printMessage();
