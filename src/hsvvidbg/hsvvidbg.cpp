@@ -27,12 +27,15 @@ int main( int argc, char** argv )
     string inputFilename;
     
     int startFrame, totalFrames;
+    
+    int bins;
 
     // Command line argument parsing
     cv::CommandLineParser parser(argc, argv,
         "{help h usage ?|               | print this message        }"
         "{o             | bgimg.jpg     | output file name          }"
         "{c             |               | camera intrinsics yml     }"
+        "{b             | 32            | number of histogram bins  }"
         "{s             | 0             | start frame               }"
         "{n             | 10            | number of frames          }"
         "{@vid_name     |               | video file name           }"
@@ -46,6 +49,7 @@ int main( int argc, char** argv )
     
     outputFilename = parser.get<string>("o");
     camFilename = parser.get<string>("c");
+    bins = parser.get<int>("b");
     startFrame = parser.get<int>("s");
     totalFrames = parser.get<int>("n");
     inputFilename = parser.get<string>("@vid_name");
@@ -81,7 +85,8 @@ int main( int argc, char** argv )
 
     // Read in video
     map<pair<int,int>, Mat> histograms;
-    int bins = 32;
+    int multiplier = 256 / bins;
+    cout << "bins: " << bins << "\tmultiplier: " << multiplier << endl;
     Mat newHist = Mat::zeros(1, bins, CV_32SC1);
     capture.set(CV_CAP_PROP_POS_FRAMES, startFrame);
     Mat bgImg(height, width, CV_8UC3);
@@ -119,7 +124,7 @@ int main( int argc, char** argv )
             }
             Mat& curHist = histograms[key];
             
-            int bin = (*it)[0] / 8;
+            int bin = (*it)[0] / multiplier;
             if ( (*it)[2] < 50 ) bin = 0;
             int curVal = curHist.at<int>(0,bin);
             curHist.at<int>(0,bin) = curVal + 1;
@@ -151,7 +156,7 @@ int main( int argc, char** argv )
                 {
                     maxCount = binVal;
                     maxBin[1] = maxBin[0];
-                    maxBin[0] = binInd*8;
+                    maxBin[0] = binInd*multiplier;
                 }
             }
             
