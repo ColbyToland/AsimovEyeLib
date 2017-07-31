@@ -1,0 +1,9 @@
+Generate a ChArUco board then display it in OpenGL on a surface like the calibration rig design. Find code to produce a fisheye effect with ground truth numbers for the lens settings.
+
+Pop open a window with the view of the calibration rig + the current angle of the calibration target.
+
+Left and right spin the board by 5 degrees.
+
+Enter saves the current rendering. With model parameters, FoV angles, and an [R|t] between the camera and target.
+
+Other controls for adjusting distortion parameters? E.g. a separate window with controls for kappa model.

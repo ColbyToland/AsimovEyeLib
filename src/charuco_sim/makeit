@@ -1,0 +1,7 @@
+#!/bin/sh
+projname=${PWD##*/}
+mkdir build
+cd build
+cmake ..
+make
+cp ${projname} ../../../${projname}
