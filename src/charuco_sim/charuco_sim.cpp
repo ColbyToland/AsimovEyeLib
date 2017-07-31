@@ -64,9 +64,9 @@ int main( int argc, char** argv )
     
     // Create and save board image
     aruco::Dictionary dictionary = aruco::getPredefinedDictionary(aruco::DICT_4X4_250); 
-    aruco::CharucoBoard board = aruco::CharucoBoard::create(5, 7, 0.04, 0.02, dictionary);
+    Ptr<aruco::CharucoBoard> board = aruco::CharucoBoard::create(5, 7, 0.04, 0.02, &dictionary);
     Mat boardImage; 
-    board.draw( Size(600, 500), boardImage, 10, 1 );
+    board->draw( Size(600, 500), boardImage, 10, 1 );
 
     printf("Success.\n");
 

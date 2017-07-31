@@ -12,9 +12,12 @@ find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
-include_directories(${OpenGL_INCLUDE_DIRS})
+include_directories(${OPENGL_INCLUDE_DIR})
 include_directories(${GLUT_INCLUDE_DIRS})
 
 add_executable(${PROJ_NAME} ${PROJ_NAME}.cpp)
 
-target_link_libraries(${PROJ_NAME} ${OpenCV_LIBS} ${OpenGL_LIBS} ${GLUT_LIBRARY})
+target_link_libraries(${PROJ_NAME} 
+                        ${OpenCV_LIBS} 
+                        ${OPENGL_LIBRARIES}
+                        ${GLUT_LIBRARY})

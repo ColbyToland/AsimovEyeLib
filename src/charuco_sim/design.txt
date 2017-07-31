@@ -1,0 +1,38 @@
+Simulator
+---------
+
+Stage 1 of development is an OpenGL simulation of the calibration rig.
+
+The rig will:
+
+    1) Render a ChArUco board on the current planned calibration
+        surface.
+        a) Multiple surfaces may be implemented arbitrarily.
+
+    2) Ground Truth: The camera parameters and lens distortion 
+        can be modelled and known.
+
+    3) Config window to allow calibration and camera parameters
+        to be changed on the fly.
+
+    4) Save image + distortion model + intrinsics + extrinsics to
+        evaluate the calibration algorithm.
+
+Pros:
+    * Ground truth data
+    * Separate real world problems (e.g. lighting and tolerances)
+        from relevant calibration problems (e.g. does the cal target
+        create a degenerate configuration and what are the limits of
+        target size/position for the cal algorithm).
+    * Rapid prototyping and the ability for multiple people to
+        design and test calibration target alternatives.
+    * Simple code - this will be a minimalist design, possibly one
+        C++ file under 1000 lines.
+
+Cons:
+    * Real world problems are ignored so game changing issues may be
+        hiding in the pre-processing stage (e.g. washed out image).
+        + I'm assuming our high control over the ATE area means
+            we have multiple solution paths.
+    * Assumption that implementing fisheye distortion is trivial via
+        a shader solution.
